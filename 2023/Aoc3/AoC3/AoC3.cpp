@@ -13,7 +13,8 @@ struct Schematic
 	{
 		E_NONE,
 		E_PART_SYMBOL,
-		E_PART_NUMBER
+		E_PART_NUMBER,
+		E_GEAR_SYMBOL
 	};
 
 	struct PartNumber
@@ -28,7 +29,6 @@ struct Schematic
 		SlotType m_Type = SlotType::E_NONE;
 		std::shared_ptr<PartNumber> m_PartNumberPtr = nullptr;
 	};
-
 
 	unsigned int SumActiveParts()
 	{
@@ -49,9 +49,6 @@ struct Schematic
 					{
 						sum += std::stoi(slot_value_string);
 						part_number_ptr->m_Checked = true;
-						//std::cout << "Slot [" << r << "][" << c << "]" << ": "
-						//	<< std::stoi(slot_value_string) << "\n"
-						//	<< "Sum: " << sum << std::endl;
 					}
 				}
 			}
@@ -68,13 +65,67 @@ struct Schematic
 		{
 			for (size_t c = start_column; c <= parse_column + 1 && c < m_Grid[0].size(); c++)
 			{
-				if (m_Grid[r][c].m_Type == SlotType::E_PART_SYMBOL)
+				SlotType current_type = m_Grid[r][c].m_Type;
+				if (current_type == SlotType::E_PART_SYMBOL || current_type == SlotType::E_GEAR_SYMBOL)
 				{
 					return true;
 				}
 			}
 		}
 		return false;
+	}
+
+	unsigned int SumGearedParts()
+	{
+		size_t num_rows = m_Grid.size();
+		size_t num_columns = num_rows < 1 ? -1 : m_Grid[0].size();
+		unsigned int sum = 0;
+
+		for (int c = 0; c < num_columns; c++)
+		{
+			for (int r = 0; r < num_rows; r++)
+			{
+				if (m_Grid[r][c].m_Type == SlotType::E_GEAR_SYMBOL)
+				{
+					sum += CalculateGearProduct(r, c);
+				}
+			}
+		}
+		return sum;
+	}
+
+	unsigned int CalculateGearProduct(size_t parse_row, size_t parse_column)
+	{
+		size_t start_row = static_cast<int>(parse_row) - 1 >= 0 ? parse_row - 1 : 0;
+		size_t start_column = static_cast<int>(parse_column) - 1 >= 0 ? parse_column - 1 : 0;
+
+		unsigned int first_gear_value = 0;
+		unsigned int second_gear_value = 0;
+
+		for (size_t r = start_row; r <= parse_row + 1 && r < m_Grid.size(); r++)
+		{
+			for (size_t c = start_column; c <= parse_column + 1 && c < m_Grid[0].size(); c++)
+			{
+				std::shared_ptr<PartNumber> part_number_ptr = m_Grid[r][c].m_PartNumberPtr;
+				const std::string& slot_value_string = part_number_ptr ? part_number_ptr->m_ValueString : "";
+
+				if (!slot_value_string.empty() && !part_number_ptr->m_Checked)
+				{
+					if (first_gear_value == 0)
+					{
+						first_gear_value = std::stoi(slot_value_string);
+						part_number_ptr->m_Checked = true;
+					}
+					else
+					{
+						second_gear_value = std::stoi(slot_value_string);
+						part_number_ptr->m_Checked = true;
+						break;
+					}
+				}
+			}
+		}
+		return first_gear_value * second_gear_value;
 	}
 
 	void AppendRow(const std::string& input)
@@ -111,7 +162,10 @@ struct Schematic
 					parsed_part_number = nullptr;
 					part_number_started = false;
 				}
-				row[i].m_Type = c == '.' ? SlotType::E_NONE : SlotType::E_PART_SYMBOL;
+				SlotType type = SlotType::E_PART_SYMBOL;
+				if (c == '.') type = SlotType::E_NONE;
+				if (c == '*') type = SlotType::E_GEAR_SYMBOL;
+				row[i].m_Type = type;
 			}
 		}
 
@@ -131,5 +185,8 @@ int main()
 	}
 
 	// Part 1:
-	std::cout << "Sum: " << schematic.SumActiveParts() << std::endl;
+	//std::cout << "Sum: " << schematic.SumActiveParts() << std::endl;
+
+	// Part 2:
+	std::cout << "Geared sum: " << schematic.SumGearedParts() << std::endl;
 }
